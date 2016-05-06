@@ -25,9 +25,7 @@ sig Hotel {
 	quartos: some Quarto
 }
 
-sig Hospede {
-	reservas: set Reserva
-}
+sig Hospede {}
 
 sig HospedeCrianca extends Hospede{
 }
@@ -39,12 +37,8 @@ sig Hospedagem {
 sig Quarto {
 }
 
-sig QuartoDuplo extends Quarto {
-	hospedes: some Hospede
-}{#(hospedes) <= 2}
-
-sig QuartoTripo extends Quarto {
-}
+sig QuartoDuplo extends Quarto {}
+sig QuartoTripo extends Quarto {}
 
 abstract sig Alimentacao {}
 sig Cafe {}
@@ -73,8 +67,10 @@ sig Reserva {
 	tipoAlimentacao: one Alimentacao,
 	tipoQuarto: one Quarto,
 	titular: one Hospede,
-	hospedes: some Hospede
+	dependentes: some Hospede
 } {
+	titular !in HospedeCrianca
+	titular in dependentes
 -- So pode criar reserva pro futuro
 -- titular deve estar em hospedes
 -- titular nao pode ser crianca
@@ -82,6 +78,18 @@ sig Reserva {
 
 sig ReservaTresDias extends Reserva {}
 sig ReservaCancelada extends Reserva {}
+
+pred hospedeTemUmaReserva[h: Hospede] {
+	one h.~dependentes
+}
+
+fun reservaDoHospede[h: Hospede] : Reserva {
+	dependentes.h
+}
+
+fact HospedeFact {
+	all h: Hospede | hospedeTemUmaReserva[h]
+}
 
 pred show[] {}
 
