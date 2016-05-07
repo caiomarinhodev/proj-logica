@@ -1,20 +1,19 @@
 --Duvidas
--- O Hotel tem um numero limitado de Hospedes? Sim Numero pequeno
--- No quarto Triplo, pode se hospedar quantas pessoas no m[inimo? Pode se hospedar uma
--- Uma crian;a pode estar hospedade sozinha? Nao
--- No completo, todas as refeicoes significa cafe almoco e janta? Sim
--- FUncoes: PegarAlimentacao, pegarQuarto
--- Conjunto de reservas canceladas existe
--- Alimentacao [e pra cada pessoa ou pro quarto? quarto
--- Crianca tem um Responsavel? Nao
--- Reserva eh individual ou feita pra um quarto? quarto
--- Pode ter soh crianca em um quarto? Nao
--- Se tiver uma crianca num quarto, precisa ter o responsavel nela? Nao, soh precisa ter adulto
--- Precisa colocar Cartao de Credito? Ja que essa eh a unica forma de fazer uma reserva
+-- FEITO O Hotel tem um numero limitado de Hospedes? Sim Numero pequeno
+-- FEITO No quarto Triplo, pode se hospedar quantas pessoas no m[inimo? Pode se hospedar uma
+-- FEITO Uma crian;a pode estar hospedade sozinha? Nao
+-- FEITO No completo, todas as refeicoes significa cafe almoco e janta? Sim
+-- FEITO Funcoes: criancas[Hospedagem], adultos[Hospedagem], hospedagemReserva
+-- FEITO Conjunto de reservas canceladas existe
+-- FEITO Alimentacao [e pra cada pessoa ou pro quarto? quarto. Fizemos como se soh existe um tipo de alimentacao pro predio todo
+-- FEITO Crianca tem um Responsavel? Nao Mas ela soh pode estar num quarto com adulto
+-- FEITO Reserva eh individual ou feita pra um quarto? quarto
+-- FEITO Pode ter soh crianca em um quarto? Nao
+-- FEITO Se tiver uma crianca num quarto, precisa ter o responsavel nela? Nao, soh precisa ter adulto
+-- FEITO Precisa colocar Cartao de Credito? Ja que essa eh a unica forma de fazer uma reserva
 ---------- Reserva usa cartao de credito, pois existe hospedagem
--- Tem que criar uma Hospedagem, pois a reserva nao significa que esta hospedado.
--- Criancas nao diminuem as vagas dos adultos.
-
+-- FEITO Tem que criar uma Hospedagem, pois a reserva nao significa que esta hospedado.
+-- FEITO Criancas nao diminuem as vagas dos adultos.
 --open util/ordering [Time]
 --sig Time {}
 
@@ -23,15 +22,16 @@ sig Hotel {
 	hospedes: set Hospede,
 	reservas: set Reserva,
 	quartos: some Quarto
-} {#(Hotel) = 1}
+}
 
-sig Hospede {}
+abstract sig Hospede {}
+sig HospedeAdulto extends Hospede{}
 sig HospedeCrianca extends Hospede{}
 
 sig Hospedagem {
 	titular: one Hospede,
 	reserva: lone Reserva,
-	tipoQuarto: one Quarto,
+	quarto: one Quarto,
 	dependentes: some Hospede,
 	formaPagamento: one FormaPagamento,
 	tipoAlimentacao: one Alimentacao
@@ -43,7 +43,7 @@ sig CartaoCredito extends FormaPagamento {}
 
 abstract sig Quarto {}
 sig QuartoDuplo extends Quarto {}
-sig QuartoTripo extends Quarto {}
+sig QuartoTriplo extends Quarto {}
 
 abstract sig Alimentacao {}
 sig Cafe {}
@@ -64,18 +64,39 @@ sig PensaoCompleta extends Alimentacao{
 
 sig Reserva {
 	tipoAlimentacao: one Alimentacao,
-	tipoQuarto: one Quarto,
+	quarto: one Quarto,
 	titular: one Hospede,
-	formaPagamento: one CartaoCredito
+	formaPagamento: lone CartaoCredito
 }
 sig ReservaTresDias extends Reserva {}
 sig ReservaCancelada extends Reserva {}
+sig ReservaNaoApareceu extends Reserva {}
 
 -- Fatos e predicados de Reserva
+pred ehReservaCancelada[r: Reserva] {
+	r in ReservaCancelada
+}
+fun hospedagemReserva[r: Reserva]: Hospedagem {
+	r.~reserva
+}
 fact ReservaFact {
 	all r: Reserva |
 		r.titular !in HospedeCrianca
 		and r in Hotel.reservas
+	
+	all r: Reserva |
+		ehReservaCancelada[r] <=> no r.formaPagamento
+
+	all r: Reserva |
+		!ehReservaCancelada[r] => one r.formaPagamento
+
+	all r: Reserva |
+		(r in ReservaCancelada or r in ReservaNaoApareceu)
+			<=> no hospedagemReserva[r]
+
+	all r: ReservaTresDias |
+		r.tipoAlimentacao in MeiaPensao
+		or r.tipoAlimentacao in PensaoCompleta
 }
 
 -- Fatos e predicados de Hospede
@@ -109,8 +130,8 @@ fact HospedeFact {
 pred mesmoTitular[h: Hospedagem, r: Reserva] {
 	h.titular = r.titular
 }
-pred mesmoTipoQuarto[h: Hospedagem, r: Reserva] {
-	h.tipoQuarto = r.tipoQuarto
+pred mesmoQuarto[h: Hospedagem, r: Reserva] {
+	h.quarto = r.quarto
 }
 pred mesmaFormaPagamento[h: Hospedagem, r: Reserva] {
 	h.formaPagamento = r.formaPagamento
@@ -118,12 +139,21 @@ pred mesmaFormaPagamento[h: Hospedagem, r: Reserva] {
 pred mesmoTipoAlimentacao[h: Hospedagem, r: Reserva] {
 	h.tipoAlimentacao = r.tipoAlimentacao
 }
+fun criancas[h: Hospedagem]: HospedeCrianca {
+	--e1 :> e2: range restriction of e1 to e2;
+	--The range restriction of e1 to e2 contains all
+	--tuples in e1 that end with an element in the set e2. 
+	h.(dependentes :> HospedeCrianca)
+}
+fun adultos[h: Hospedagem]: Hospede {
+	h.(dependentes :> HospedeAdulto)	
+}
 fact HospedagemFact {
 	all h: Hospedagem, r: Reserva |
 		(h.reserva = r => mesmoTitular[h, r])
 		and
 		(mesmoTitular[h, r]
-			=> h.reserva = r and mesmoTipoQuarto[h, r]
+			=> h.reserva = r and mesmoQuarto[h, r]
 				and mesmaFormaPagamento[h, r])
 	
 	all h: Hospedagem, r: Reserva |
@@ -132,29 +162,46 @@ fact HospedagemFact {
 	all h: Hospedagem |
 		h.titular in h.dependentes
 		and h.titular !in HospedeCrianca
-		and h.reserva !in ReservaCancelada
+		and (some ReservaCancelada => h.reserva !in ReservaCancelada) --Fiz assim pq ele considera falso !in pra um conjunto Vazio eh tipo como se todo elemento estivesse in um conjunto vazio
+		and h in Hotel.hospedagens
 
 	all h1,h2: Hospedagem |
-		(h1 != h2) => no h1.dependentes & h2.dependentes
+		(h1 != h2) => (
+			no h1.dependentes & h2.dependentes
+			and h1.quarto != h2.quarto
+		)
+	
+	all h: Hospedagem |
+		(h.quarto in QuartoDuplo =>
+			#(adultos[h]) <= 2
+			and #(criancas[h]) <= 1)
+		and
+		(h.quarto in QuartoTriplo =>
+			#(adultos[h]) <= 3
+			and #(criancas[h]) <= 2)
 }
 
--- Fatos e predicados de Alimentacao
-fact AlimentacaoFacts {
+-- Fatos Que tem uma quantidade fixada no projeto
+fact ConstantFacts {
+	#(Hotel) = 1
 	#(Cafe) = 1
 	#(Almoco) = 1
 	#(Janta) = 1
 	#(ApenasCafe) = 1
 	#(MeiaPensao) = 1
 	#(PensaoCompleta) = 1
-}
-
-fact ConstantFacts {
-	#(Hospede) = 3
-	#(Hospedagem) = 0
-	#(Reserva) = 3
 	#(CartaoCredito) = 1
 	#(Dinheiro) = 1
 }
+
+fact SohPraVerSeTaCertoTestes {
+	#(Hospede) = 4
+	#(Hospedagem) = 1
+	#(Reserva) = 2
+	#(QuartoTriplo) = 0
+	#(Hospedagem.reserva) > 0
+}
+
 pred show[] {}
 
-run show for 5
+run show for 6
