@@ -1,4 +1,4 @@
-# Proeto Lógica 2015.2
+# Projeto Lógica 2015.2
 ## Equipe
 - Catarina Silva
 - Kallynny Karlla
@@ -6,7 +6,7 @@
 - Stênio Elson
 
 ## Objetivo
-Especificar formalmente o modelo-solução para um problema. Isto deve ser feito utilizando-se [`Alloy`](http://alloy.mit.edu/alloy).
+Especificar formalmente um modelo-solução para um problema. Isto deve ser feito utilizando-se [`Alloy`](http://alloy.mit.edu/alloy).
 
 ## Descrição do Problema
 **Tema: Hotel**
