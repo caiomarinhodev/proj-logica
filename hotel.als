@@ -109,9 +109,6 @@ pred hospedeTitularReserva[h: Hospede, r: Reserva] {
 pred hospedeTitularHospedagem[h: Hospede, o: Hospedagem] {
 	o.titular = h
 }
-fun hospedagemDoHospede[h: Hospede] : Hospedagem {
-	dependentes.h
-}
 fact HospedeFact {
 	all h: Hospede |
 		hospedeTemUmaHospedagem[h]
