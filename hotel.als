@@ -47,18 +47,6 @@ abstract sig Quarto {}
 sig QuartoDuplo extends Quarto {}
 sig QuartoTriplo extends Quarto {}
 
--- Fatos e predicados de Quarto
-fact QuartoFact {
-	all r: Reserva, h: Hospedagem |
-		h.reserva != r => r.quarto != h.quarto
-	
-	all h1, h2: Hospedagem |
-		h1 != h2 => h1.quarto != h2.quarto
-
-	all r1, r2: Reserva |
-		r1 != r2 => r1.quarto != r2.quarto
-}
-
 abstract sig Alimentacao {}
 sig Cafe {}
 sig Almoco  {}
@@ -84,13 +72,31 @@ sig Reserva {
 }
 sig ReservaTresDias extends Reserva {}
 
+------------------------------------------------------------------------------------
+-- Fatos e predicados de Quarto
+-------------------------------------------------------------------------------------
+fact QuartoFact {
+	all r: Reserva, h: Hospedagem |
+		h.reserva != r => r.quarto != h.quarto
+	
+	all h1, h2: Hospedagem |
+		h1 != h2 => h1.quarto != h2.quarto
+
+	all r1, r2: Reserva |
+		r1 != r2 => r1.quarto != r2.quarto
+}
+
+--------------------------------------------------------------------------------------
 -- Fatos e predicados de Reserva
+--------------------------------------------------------------------------------------
 pred ehReservaCancelada[r: Reserva, t: Time] {
 	r in (Hotel.reservasCanceladas).t
 }
+
 fun hospedagemReserva[r: Reserva]: Hospedagem {
 	r.~reserva
 }
+
 fact ReservaFact {
 	all r: Reserva |
 		r.titular !in HospedeCrianca
@@ -100,7 +106,9 @@ fact ReservaFact {
 		or r.tipoAlimentacao in PensaoCompleta
 }
 
+--------------------------------------------------------------------------------------
 -- Fatos e predicados de Hospede
+--------------------------------------------------------------------------------------
 pred hospedeTemUmaHospedagem[h: Hospede] {
 	one h.~dependentes
 }
@@ -124,8 +132,9 @@ fact HospedeFact {
 			=> !hospedeTitularReserva[h, r2]
 }
 
-
+------------------------------------------------------------------------------------------
 -- Fatos e predicados de Hospedagem
+------------------------------------------------------------------------------------------
 pred mesmoTitular[h: Hospedagem, r: Reserva] {
 	h.titular = r.titular
 }
@@ -147,6 +156,7 @@ fun criancas[h: Hospedagem]: HospedeCrianca {
 fun adultos[h: Hospedagem]: Hospede {
 	h.(dependentes :> HospedeAdulto)	
 }
+
 fact HospedagemFact {
 	all h: Hospedagem, r: Reserva |
 		(h.reserva = r => mesmoTitular[h, r])
@@ -175,13 +185,16 @@ fact HospedagemFact {
 			and #(criancas[h]) <= 2)
 }
 
+---------------------------------------------------------------------------------------------------
 --Operacoes
+---------------------------------------------------------------------------------------------------
 pred registrarHospedagemSemReserva[o: Hotel, h: Hospedagem, t,t': Time] {
 	no h.reserva
 	h !in (o.hospedagens).t
 	(o.hospedagens).t' = (o.hospedagens).t + h
 	checkInHospedes[o, h.dependentes, t, t']
 }
+
 pred confirmarReserva[o: Hotel, r: Reserva, h: Hospedagem, t,t': Time] {
 	h.reserva = r
 	r in (o.reservas).t
@@ -190,7 +203,8 @@ pred confirmarReserva[o: Hotel, r: Reserva, h: Hospedagem, t,t': Time] {
 	(o.reservas).t' = (o.reservas).t - r
 	(o.hospedagens).t' = (o.hospedagens).t + h
 }
--- Os hospedes sao registrados ao mesmo tempo que uma hospedagem eh registrada
+
+-- Os hospedes sao registrados ao mesmo tempo que uma hospedagem é registrada
 pred checkInHospedes[o: Hotel, hos: Hospede, t,t': Time] {
 	hos !in (o.hospedes).t
 	(o.hospedes).t' = (o.hospedes).t + hos
@@ -216,7 +230,22 @@ pred faltarReserva[o: Hotel, r: Reserva, t,t': Time] {
 	(o.reservasNaoApareceu).t' = (o.reservasNaoApareceu).t + r
 }
 
+-- Fatos Que tem uma quantidade fixa no projeto
+fact ConstantFacts {
+	#(Hotel) = 1
+	#(Cafe) = 1
+	#(Almoco) = 1
+	#(Janta) = 1
+	#(ApenasCafe) = 1
+	#(MeiaPensao) = 1
+	#(PensaoCompleta) = 1
+	#(CartaoCredito) = 1
+	#(Dinheiro) = 1
+}
+
+-----------------------------------------------------------------------------------
 --Traces
+-----------------------------------------------------------------------------------
 pred init[t:Time] {
 	no (Hotel.hospedagens).t
 	no (Hotel.hospedagensPassadas).t
@@ -239,7 +268,9 @@ fact Traces {
 			    faltarReserva[o, r, pre, pos]
 }
 
+----------------------------------------------------------------------------------------------
 -- Asserts
+----------------------------------------------------------------------------------------------
 assert titularNaoEhCrianca {
 	all h: Hospedagem |
 		h.titular !in HospedeCrianca
@@ -249,21 +280,22 @@ assert todaHospedagemComReservaTemMesmaInformacaoQueReserva {
 		one h.reserva => h.titular = (h.reserva).titular
 }
 
+assert hospedesNaoOcupamDuasHospedagens{
+		all h1,h2: Hospedagem, t: Time |
+		(h1 != h2 and (h1 -> t in Hotel.hospedagens and h2 -> t in Hotel.hospedagens))
+			=> no h1.dependentes & h2.dependentes	
+}
+
+assert reservaCanceladaNaoPaga{
+	all r: Reserva, t: Time| r in (Hotel.reservasCanceladas).t 
+     => no r.formaPagamento
+}
+
 check titularNaoEhCrianca
 check todaHospedagemComReservaTemMesmaInformacaoQueReserva
+check hospedesNaoOcupamDuasHospedagens
+check reservaCanceladaNaoPaga
 
--- Fatos Que tem uma quantidade fixada no projeto
-fact ConstantFacts {
-	#(Hotel) = 1
-	#(Cafe) = 1
-	#(Almoco) = 1
-	#(Janta) = 1
-	#(ApenasCafe) = 1
-	#(MeiaPensao) = 1
-	#(PensaoCompleta) = 1
-	#(CartaoCredito) = 1
-	#(Dinheiro) = 1
-}
 
 pred show[] {}
 
