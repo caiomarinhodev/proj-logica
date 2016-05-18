@@ -80,7 +80,7 @@ sig Reserva {
 	tipoAlimentacao: one Alimentacao,
 	quarto: one Quarto,
 	titular: one Hospede,
-	formaPagamento: lone CartaoCredito
+	formaPagamento: CartaoCredito lone -> Time
 }
 sig ReservaTresDias extends Reserva {}
 
@@ -132,8 +132,8 @@ pred mesmoTitular[h: Hospedagem, r: Reserva] {
 pred mesmoQuarto[h: Hospedagem, r: Reserva] {
 	h.quarto = r.quarto
 }
-pred mesmaFormaPagamento[h: Hospedagem, r: Reserva] {
-	h.formaPagamento = r.formaPagamento
+pred mesmaFormaPagamento[h: Hospedagem, r: Reserva, t: Time] {
+	h.formaPagamento = (r.formaPagamento).t
 }
 pred mesmoTipoAlimentacao[h: Hospedagem, r: Reserva] {
 	h.tipoAlimentacao = r.tipoAlimentacao
@@ -152,8 +152,7 @@ fact HospedagemFact {
 		(h.reserva = r => mesmoTitular[h, r])
 		and
 		(mesmoTitular[h, r]
-			=> h.reserva = r and mesmoQuarto[h, r]
-				and mesmaFormaPagamento[h, r])
+			=> h.reserva = r and mesmoQuarto[h, r])
 	
 	all h: Hospedagem, r: Reserva |
 		h.reserva != r => r.titular !in h.dependentes
@@ -187,6 +186,7 @@ pred confirmarReserva[o: Hotel, r: Reserva, h: Hospedagem, t,t': Time] {
 	h.reserva = r
 	r in (o.reservas).t
 	h !in (o.hospedagens).t
+	mesmaFormaPagamento[h,r,t']
 	(o.reservas).t' = (o.reservas).t - r
 	(o.hospedagens).t' = (o.hospedagens).t + h
 }
@@ -196,7 +196,7 @@ pred checkInHospedes[o: Hotel, hos: Hospede, t,t': Time] {
 	(o.hospedes).t' = (o.hospedes).t + hos
 }
 pred registrarReserva[o: Hotel, r: Reserva, t,t': Time] {
-	r.formaPagamento = CartaoCredito
+	CartaoCredito -> t' in r.formaPagamento
 	r !in (o.reservas).t
 	(o.reservas).t' = (o.reservas).t + r
 }
@@ -208,22 +208,12 @@ pred removerReserva[o: Hotel, r: Reserva, t,t': Time] {
 }
 pred cancelarReserva[o: Hotel, r: Reserva, t,t': Time] {
 	removerReserva[o,r,t,t']
+	CartaoCredito -> t' !in r.formaPagamento
 	(o.reservasCanceladas).t' = (o.reservasCanceladas).t + r
 }
 pred faltarReserva[o: Hotel, r: Reserva, t,t': Time] {
 	removerReserva[o,r,t,t']
 	(o.reservasNaoApareceu).t' = (o.reservasNaoApareceu).t + r
-}
-pred checkOutHospedes[o: Hotel, hos: Hospede, t,t': Time] {
-	hos in (o.hospedes).t
-	(o.hospedes).t' = (o.hospedes).t - hos
-}
-pred encerrarHospedagem[o: Hotel, h: Hospedagem, t,t': Time] {
-	h in (o.hospedagens).t
-	h !in (o.hospedagensPassadas).t
-
-	(o.hospedagens).t' = (o.hospedagens).t - h
-	(o.hospedagensPassadas).t' = (o.hospedagensPassadas).t + h
 }
 
 --Traces
@@ -248,6 +238,19 @@ fact Traces {
 			or
 			    faltarReserva[o, r, pre, pos]
 }
+
+-- Asserts
+assert titularNaoEhCrianca {
+	all h: Hospedagem |
+		h.titular !in HospedeCrianca
+}
+assert todaHospedagemComReservaTemMesmaInformacaoQueReserva {
+	all h: Hospedagem |
+		one h.reserva => h.titular = (h.reserva).titular
+}
+
+check titularNaoEhCrianca
+check todaHospedagemComReservaTemMesmaInformacaoQueReserva
 
 -- Fatos Que tem uma quantidade fixada no projeto
 fact ConstantFacts {
