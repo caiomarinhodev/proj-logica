@@ -21,6 +21,7 @@ sig Hotel {
 	hospedagens: Hospedagem -> Time,
 	hospedes: Hospede -> Time,
 	reservas: Reserva -> Time,
+	reservasCanceladas: Reserva -> Time,
 	hospedagensPassadas: Hospedagem -> Time
 }
 
@@ -81,12 +82,10 @@ sig Reserva {
 	formaPagamento: lone CartaoCredito
 }
 sig ReservaTresDias extends Reserva {}
-sig ReservaCancelada extends Reserva {}
-sig ReservaNaoApareceu extends Reserva {}
 
 -- Fatos e predicados de Reserva
-pred ehReservaCancelada[r: Reserva] {
-	r in ReservaCancelada
+pred ehReservaCancelada[r: Reserva, t: Time] {
+	r in (Hotel.reservasCanceladas).t
 }
 fun hospedagemReserva[r: Reserva]: Hospedagem {
 	r.~reserva
@@ -94,16 +93,6 @@ fun hospedagemReserva[r: Reserva]: Hospedagem {
 fact ReservaFact {
 	all r: Reserva |
 		r.titular !in HospedeCrianca
-	
-	all r: Reserva |
-		ehReservaCancelada[r] <=> no r.formaPagamento
-
-	all r: Reserva |
-		!ehReservaCancelada[r] => one r.formaPagamento
-
-	all r: Reserva |
-		(r in ReservaCancelada or r in ReservaNaoApareceu)
-			<=> no hospedagemReserva[r]
 
 	all r: ReservaTresDias |
 		r.tipoAlimentacao in MeiaPensao
@@ -171,7 +160,6 @@ fact HospedagemFact {
 	all h: Hospedagem |
 		h.titular in h.dependentes
 		and h.titular !in HospedeCrianca
-		and (some ReservaCancelada => h.reserva !in ReservaCancelada) --Fiz assim pq ele considera falso !in pra um conjunto Vazio eh tipo como se todo elemento estivesse in um conjunto vazio
 
 	all h1,h2: Hospedagem, t: Time |
 		(h1 != h2 and (h1 -> t in Hotel.hospedagens and h2 -> t in Hotel.hospedagens))
@@ -197,6 +185,15 @@ pred checkInHospedes[o: Hotel, hos: Hospede, t,t': Time] {
 	hos !in (o.hospedes).t
 	(o.hospedes).t' = (o.hospedes).t + hos
 }
+pred registrarReserva[o: Hotel, r: Reserva, t,t': Time] {
+	r !in (o.reservas).t
+	(o.reservas).t' = (o.reservas).t + r
+}
+pred cancelarReserva[o: Hotel, r: Reserva, t,t': Time] {
+	r in (o.reservas).t
+	(o.reservas).t' = (o.reservas).t - r
+	(o.reservasCanceladas).t' = (o.reservasCanceladas).t + r
+}
 pred checkOutHospedes[o: Hotel, hos: Hospede, t,t': Time] {
 	hos in (o.hospedes).t
 	(o.hospedes).t' = (o.hospedes).t - hos
@@ -213,16 +210,21 @@ pred encerrarHospedagem[o: Hotel, h: Hospedagem, t,t': Time] {
 pred init[t:Time] {
 	no (Hotel.hospedagens).t
 	no (Hotel.hospedagensPassadas).t
-	no Hotel.reservas
+	no (Hotel.reservas).t
+	no (Hotel.reservasCanceladas).t
 	no (Hotel.hospedes).t
 }
 fact Traces {
 	init[first]
 	all pre: Time-last | let pos = pre.next |
-		some h: Hospedagem, o: Hotel|
+		some h: Hospedagem, o: Hotel, r: Reserva |
+			    registrarReserva[o, r, pre, pos]
+			or
 			    registrarHospedagem[o, h, pre, pos]
 			    and
 			    checkInHospedes[o, h.dependentes, pre, pos]
+			or
+			    cancelarReserva[o, r, pre, pos]
 }
 
 -- Fatos Que tem uma quantidade fixada no projeto
