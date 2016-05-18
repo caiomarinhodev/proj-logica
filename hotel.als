@@ -22,6 +22,7 @@ sig Hotel {
 	hospedes: Hospede -> Time,
 	reservas: Reserva -> Time,
 	reservasCanceladas: Reserva -> Time,
+	reservasNaoApareceu: Reserva -> Time,
 	hospedagensPassadas: Hospedagem -> Time
 }
 
@@ -176,8 +177,17 @@ fact HospedagemFact {
 }
 
 --Operacoes
-pred registrarHospedagem[o: Hotel, h: Hospedagem, t,t': Time] {
+pred registrarHospedagemSemReserva[o: Hotel, h: Hospedagem, t,t': Time] {
+	no h.reserva
 	h !in (o.hospedagens).t
+	(o.hospedagens).t' = (o.hospedagens).t + h
+	checkInHospedes[o, h.dependentes, t, t']
+}
+pred confirmarReserva[o: Hotel, r: Reserva, h: Hospedagem, t,t': Time] {
+	h.reserva = r
+	r in (o.reservas).t
+	h !in (o.hospedagens).t
+	(o.reservas).t' = (o.reservas).t - r
 	(o.hospedagens).t' = (o.hospedagens).t + h
 }
 -- Os hospedes sao registrados ao mesmo tempo que uma hospedagem eh registrada
@@ -186,13 +196,23 @@ pred checkInHospedes[o: Hotel, hos: Hospede, t,t': Time] {
 	(o.hospedes).t' = (o.hospedes).t + hos
 }
 pred registrarReserva[o: Hotel, r: Reserva, t,t': Time] {
+	r.formaPagamento = CartaoCredito
 	r !in (o.reservas).t
 	(o.reservas).t' = (o.reservas).t + r
 }
-pred cancelarReserva[o: Hotel, r: Reserva, t,t': Time] {
+pred removerReserva[o: Hotel, r: Reserva, t,t': Time] {
 	r in (o.reservas).t
+	hospedagemReserva[r] !in (o.hospedagens).t
+	hospedagemReserva[r] !in (o.hospedagens).t'
 	(o.reservas).t' = (o.reservas).t - r
+}
+pred cancelarReserva[o: Hotel, r: Reserva, t,t': Time] {
+	removerReserva[o,r,t,t']
 	(o.reservasCanceladas).t' = (o.reservasCanceladas).t + r
+}
+pred faltarReserva[o: Hotel, r: Reserva, t,t': Time] {
+	removerReserva[o,r,t,t']
+	(o.reservasNaoApareceu).t' = (o.reservasNaoApareceu).t + r
 }
 pred checkOutHospedes[o: Hotel, hos: Hospede, t,t': Time] {
 	hos in (o.hospedes).t
@@ -220,11 +240,13 @@ fact Traces {
 		some h: Hospedagem, o: Hotel, r: Reserva |
 			    registrarReserva[o, r, pre, pos]
 			or
-			    registrarHospedagem[o, h, pre, pos]
-			    and
-			    checkInHospedes[o, h.dependentes, pre, pos]
+			    registrarHospedagemSemReserva[o, h, pre, pos]
 			or
 			    cancelarReserva[o, r, pre, pos]
+			or
+			    confirmarReserva[o, r, h, pre, pos]
+			or
+			    faltarReserva[o, r, pre, pos]
 }
 
 -- Fatos Que tem uma quantidade fixada no projeto
