@@ -14,14 +14,14 @@
 ---------- Reserva usa cartao de credito, pois existe hospedagem
 -- FEITO Tem que criar uma Hospedagem, pois a reserva nao significa que esta hospedado.
 -- FEITO Criancas nao diminuem as vagas dos adultos.
---open util/ordering [Time]
---sig Time {}
+open util/ordering [Time]
+sig Time {}
 
 sig Hotel {
-	hospedagens: set Hospedagem,
-	hospedes: set Hospede,
-	reservas: set Reserva,
-	quartos: some Quarto
+	hospedagens: Hospedagem -> Time,
+	hospedes: Hospede -> Time,
+	reservas: Reserva -> Time,
+	hospedagensPassadas: Hospedagem -> Time
 }
 
 abstract sig Hospede {}
@@ -44,6 +44,18 @@ sig CartaoCredito extends FormaPagamento {}
 abstract sig Quarto {}
 sig QuartoDuplo extends Quarto {}
 sig QuartoTriplo extends Quarto {}
+
+-- Fatos e predicados de Quarto
+fact QuartoFact {
+	all r: Reserva, h: Hospedagem |
+		h.reserva != r => r.quarto != h.quarto
+	
+	all h1, h2: Hospedagem |
+		h1 != h2 => h1.quarto != h2.quarto
+
+	all r1, r2: Reserva |
+		r1 != r2 => r1.quarto != r2.quarto
+}
 
 abstract sig Alimentacao {}
 sig Cafe {}
@@ -82,7 +94,6 @@ fun hospedagemReserva[r: Reserva]: Hospedagem {
 fact ReservaFact {
 	all r: Reserva |
 		r.titular !in HospedeCrianca
-		and r in Hotel.reservas
 	
 	all r: Reserva |
 		ehReservaCancelada[r] <=> no r.formaPagamento
@@ -121,8 +132,6 @@ fact HospedeFact {
 	all h: Hospede, r1,r2: Reserva |
 		(r1 != r2 and hospedeTitularReserva[h, r1])
 			=> !hospedeTitularReserva[h, r2]
-
-	all h: Hospede | h in Hotel.hospedes
 }
 
 
@@ -163,13 +172,10 @@ fact HospedagemFact {
 		h.titular in h.dependentes
 		and h.titular !in HospedeCrianca
 		and (some ReservaCancelada => h.reserva !in ReservaCancelada) --Fiz assim pq ele considera falso !in pra um conjunto Vazio eh tipo como se todo elemento estivesse in um conjunto vazio
-		and h in Hotel.hospedagens
 
-	all h1,h2: Hospedagem |
-		(h1 != h2) => (
-			no h1.dependentes & h2.dependentes
-			and h1.quarto != h2.quarto
-		)
+	all h1,h2: Hospedagem, t: Time |
+		(h1 != h2 and (h1 -> t in Hotel.hospedagens and h2 -> t in Hotel.hospedagens))
+			=> no h1.dependentes & h2.dependentes
 	
 	all h: Hospedagem |
 		(h.quarto in QuartoDuplo =>
@@ -179,6 +185,44 @@ fact HospedagemFact {
 		(h.quarto in QuartoTriplo =>
 			#(adultos[h]) <= 3
 			and #(criancas[h]) <= 2)
+}
+
+--Operacoes
+pred registrarHospedagem[o: Hotel, h: Hospedagem, t,t': Time] {
+	h !in (o.hospedagens).t
+	(o.hospedagens).t' = (o.hospedagens).t + h
+}
+-- Os hospedes sao registrados ao mesmo tempo que uma hospedagem eh registrada
+pred checkInHospedes[o: Hotel, hos: Hospede, t,t': Time] {
+	hos !in (o.hospedes).t
+	(o.hospedes).t' = (o.hospedes).t + hos
+}
+pred checkOutHospedes[o: Hotel, hos: Hospede, t,t': Time] {
+	hos in (o.hospedes).t
+	(o.hospedes).t' = (o.hospedes).t - hos
+}
+pred encerrarHospedagem[o: Hotel, h: Hospedagem, t,t': Time] {
+	h in (o.hospedagens).t
+	h !in (o.hospedagensPassadas).t
+
+	(o.hospedagens).t' = (o.hospedagens).t - h
+	(o.hospedagensPassadas).t' = (o.hospedagensPassadas).t + h
+}
+
+--Traces
+pred init[t:Time] {
+	no (Hotel.hospedagens).t
+	no (Hotel.hospedagensPassadas).t
+	no Hotel.reservas
+	no (Hotel.hospedes).t
+}
+fact Traces {
+	init[first]
+	all pre: Time-last | let pos = pre.next |
+		some h: Hospedagem, o: Hotel|
+			    registrarHospedagem[o, h, pre, pos]
+			    and
+			    checkInHospedes[o, h.dependentes, pre, pos]
 }
 
 -- Fatos Que tem uma quantidade fixada no projeto
@@ -194,14 +238,6 @@ fact ConstantFacts {
 	#(Dinheiro) = 1
 }
 
-fact SohPraVerSeTaCertoTestes {
-	#(Hospede) = 4
-	#(Hospedagem) = 1
-	#(Reserva) = 2
-	#(QuartoTriplo) = 0
-	#(Hospedagem.reserva) > 0
-}
-
 pred show[] {}
 
-run show for 6
+run show for 4
